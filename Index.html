@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamHub - Fullscreen</title>
+    <style>
+        /* ================= TAMPILAN (CSS) ================= */
+        :root {
+            --bg: #0f1014;
+            --text: #ffffff;
+            --accent: #ff4757;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 50px; }
+
+        /* HEADER */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px; background: #000; border-bottom: 1px solid #333;
+            position: sticky; top: 0; z-index: 50;
+        }
+        .logo { font-size: 20px; font-weight: bold; color: #fff; text-decoration: none; }
+        .logo span { color: var(--accent); }
+
+        /* --- PERBAIKAN UTAMA: MODAL FULLSCREEN --- */
+        .modal {
+            display: none; /* Sembunyi awal */
+            position: fixed; 
+            top: 0; left: 0; 
+            width: 100vw; 
+            height: 100vh;
+            background: #000; 
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        /* Kotak Video: Dibuat memenuhi layar 100% tanpa batas rasio */
+        .modal-box {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Iframe: Wajib 100% */
+        iframe { width: 100%; height: 100%; border: none; }
+
+        /* Tombol Tutup: Ditaruh di pojok atas agar mudah dipencet */
+        .close-btn {
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            color: #fff; 
+            background: rgba(0,0,0,0.5);
+            padding: 8px 15px;
+            border-radius: 50px;
+            font-size: 14px; 
+            cursor: pointer; 
+            z-index: 10000; /* Paling atas */
+            border: 1px solid #fff;
+        }
+
+        /* --- DAFTAR VIDEO --- */
+        .search-area { padding: 20px; text-align: center; }
+        .search-area input { padding: 10px; width: 50%; border-radius: 5px; border: none; }
+        .search-area button { padding: 10px; border-radius: 5px; border: none; background: var(--accent); color: #fff; font-weight: bold;}
+
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; }
+        
+        .card { background: #1f2029; border-radius: 8px; overflow: hidden; }
+        .thumb { position: relative; width: 100%; padding-top: 56.25%; background: #333; }
+        .thumb img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        .info { padding: 10px; font-size: 12px; }
+        .title { font-weight: bold; margin-bottom: 5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;}
+    </style>
+</head>
+<body>
+
+    <div class="modal" id="videoModal">
+        <div class="close-btn" onclick="closePlayer()">✕</div>
+        <div class="modal-box">
+            <iframe id="playerFrame" src="" allow="autoplay; fullscreen"></iframe>
+        </div>
+    </div>
+
+    <header>
+        <a href="#" class="logo">CONTEN<span>18+</span></a>
+    </header>
+
+    <div class="search-area">
+        <input type="text" id="searchInput" placeholder="Cari video...">
+        <button onclick="searchVideo()">Cari</button>
+    </div>
+
+    <div class="grid" id="videoGrid"></div>
+
+    <script>
+        // DATA VIDEO (Contoh Video Tegak/Portrait & Landscape)
+        const videoData = [
+            {
+                title: "abg rambut pendek cantik kacamata colok memek part (3).mp4",
+                image: "https://drive.google.com/uc?export=view&id=1VGgyTL5axMTTfzwuEzlIpmab4M4CXTfp",
+                // Ganti URL ini dengan link drive Mas
+                url: "https://drive.google.com/file/d/1VGgyTL5axMTTfzwuEzlIpmab4M4CXTfp/view?usp=drivesdk"
+            },
+            {
+                title: "Abg rambut pendek punya memek enak banget.mp4)",
+                image: "https://placehold.co/600x400/333/fff?text=Video+YouTube",
+                url: "https://drive.google.com/file/d/1f47uJzXccBinIwT8fVeAoyinUt9Qe28e/view?usp=drivesdk"
+            },             {
+                title: "ABG Rambut Pendek WOT.mp4",
+                image: "https://placehold.co/600x400/444/fff?text=Supra+Cinematic",
+                url: "https://drive.google.com/file/d/15Ce7dc648tPWolbfuafTQRvFf9jNlI8r/view?usp=drivesdk" // Contoh link
+            },             
+            {
+                title: "Bokep indo anal 3gp tante rambut pendek - XbokepFb.mp4",
+                image: "https://placehold.co/600x400/444/fff?text=Supra+Cinematic",
+                url: "https://drive.google.com/file/d/1r_Wpwnvq-aKuMQYT8cZyVH6TEdGFHEuC/view?usp=drivesdk" // Contoh link
+            },
+
+        ];
+
+        // 1. SISTEM LINK OTOMATIS
+        function getEmbedUrl(rawUrl) {
+            let embedUrl = "";
+            if (rawUrl.includes("drive.google.com")) {
+                // Ubah ke mode preview agar fullscreen
+                embedUrl = rawUrl.replace("/view", "/preview").replace("?usp=sharing", "");
+            } else if (rawUrl.includes("youtube.com") || rawUrl.includes("youtu.be")) {
+                let videoId = rawUrl.split('v=')[1] || rawUrl.split('youtu.be/')[1];
+                if(videoId) videoId = videoId.split('&')[0];
+                embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+            } else {
+                embedUrl = rawUrl;
+            }
+            return embedUrl;
+        }
+
+        // 2. FUNGSI PLAY & CLOSE
+        function playVideo(url) {
+            document.getElementById("playerFrame").src = getEmbedUrl(url);
+            document.getElementById("videoModal").style.display = "flex";
+        }
+
+        function closePlayer() {
+            document.getElementById("videoModal").style.display = "none";
+            document.getElementById("playerFrame").src = "";
+        }
+
+        // 3. RENDER VIDEO
+        function renderVideos(list) {
+            const grid = document.getElementById("videoGrid");
+            grid.innerHTML = "";
+            list.forEach(vid => {
+                grid.innerHTML += `
+                    <div class="card" onclick="playVideo('${vid.url}')">
+                        <div class="thumb"><img src="${vid.image}"></div>
+                        <div class="info"><div class="title">${vid.title}</div></div>
+                    </div>
+                `;
+            });
+        }
+        
+        // Search
+        function searchVideo(){
+            const key = document.getElementById("searchInput").value.toLowerCase();
+            renderVideos(videoData.filter(v => v.title.toLowerCase().includes(key)));
+        }
+
+        // Jalankan
+        renderVideos(videoData);
+    </script>
+</body>
+</html>
