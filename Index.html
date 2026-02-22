@@ -3,61 +3,169 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamHub - Fullscreen</title>
+    <title>StreamTube Cloud - Tanpa Iklan</title>
     <style>
-        /* ================= TAMPILAN (CSS) ================= */
-        :root {
-            --bg: #0f1014;
-            --text: #ffffff;
-            --accent: #ff4757;
+        /* CSS SEDERHANA & BERSIH */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #0f0f0f; color: white; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 5%; background: #0f0f0f; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 22px; font-weight: bold; cursor: pointer; }
+        .logo span { color: #ff0000; }
+        .btn-upload { background: #ff0000; color: white; border: none; padding: 8px 18px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        
+        main { display: flex; flex-wrap: wrap; padding: 20px 5%; gap: 30px; }
+        .video-player { flex: 2; min-width: 300px; }
+        video { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 16/9; }
+        .video-info h1 { margin-top: 15px; font-size: 20px; }
+
+        .video-list { flex: 1; min-width: 300px; }
+        .video-list h3 { margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        .thumbnail { display: flex; gap: 12px; margin-bottom: 15px; cursor: pointer; background: #1e1e1e; padding: 10px; border-radius: 8px; transition: 0.3s; position: relative; }
+        .thumbnail:hover { background: #333; }
+        .thumb-img { width: 120px; height: 70px; background: #444; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .thumb-text { overflow: hidden; }
+        .thumb-text h4 { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .btn-delete { background: none; border: none; color: #ff4d4d; cursor: pointer; font-size: 12px; margin-top: 5px; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; }
+        .modal-content { background: #282828; margin: 10% auto; padding: 25px; width: 90%; max-width: 450px; border-radius: 12px; }
+        .close { float: right; cursor: pointer; font-size: 24px; }
+        form input, form textarea { width: 100%; margin: 10px 0; padding: 12px; background: #121212; border: 1px solid #444; color: white; border-radius: 6px; }
+        .btn-submit { width: 100%; padding: 12px; background: #ff0000; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" onclick="location.reload()">Stream<span>Tube</span></div>
+        <button class="btn-upload" onclick="toggleModal()">+ UPLOAD</button>
+    </header>
+
+    <main>
+        <section class="video-player">
+            <video id="mainPlayer" controls src=""></video>
+            <div class="video-info">
+                <h1 id="videoTitleDisplay">Pilih video dari daftar untuk menonton</h1>
+            </div>
+        </section>
+
+        <aside class="video-list" id="videoContainer">
+            <h3>Daftar Video</h3>
+            </aside>
+    </main>
+
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="toggleModal()">&times;</span>
+            <h2>Upload Video</h2>
+            <form id="uploadForm">
+                <input type="text" id="videoTitle" placeholder="Judul Video" required>
+                <input type="file" id="videoFile" accept="video/*" required>
+                <button type="submit" class="btn-submit" id="btnLabel">MULAI UPLOAD</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+    <script>
+        // 1. CONFIG FIREBASE (Ganti dengan milikmu sendiri)
+        const firebaseConfig = {
+            apiKey: "MASUKKAN_API_KEY_KAMU",
+            authDomain: "PROJECT_KAMU.firebaseapp.com",
+            projectId: "PROJECT_KAMU",
+            storageBucket: "PROJECT_KAMU.appspot.com",
+            messagingSenderId: "ID_KAMU",
+            appId: "APP_ID_KAMU"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // 2. LOGIKA UI & MODAL
+        function toggleModal() {
+            const modal = document.getElementById('uploadModal');
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; }
-        body { background-color: var(--bg); color: var(--text); padding-bottom: 50px; }
 
-        /* HEADER */
-        header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 20px; background: #000; border-bottom: 1px solid #333;
-            position: sticky; top: 0; z-index: 50;
+        // 3. LOGIKA UPLOAD KE CLOUD
+        const uploadForm = document.getElementById('uploadForm');
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const file = document.getElementById('videoFile').files[0];
+            const title = document.getElementById('videoTitle').value;
+            const btn = document.getElementById('btnLabel');
+
+            btn.innerText = "Sabar, Lagi Upload...";
+            btn.disabled = true;
+
+            const storageRef = storage.ref('videos/' + Date.now() + "_" + file.name);
+            const uploadTask = storageRef.put(file);
+
+            uploadTask.on('state_changed', null, 
+                (err) => { alert("Error: " + err.message); btn.disabled = false; }, 
+                () => {
+                    uploadTask.snapshot.ref.getDownloadURL().then((url) => {
+                        db.collection("videos").add({
+                            title: title,
+                            url: url,
+                            fileName: storageRef.fullPath, // Simpan nama file untuk hapus nanti
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        }).then(() => {
+                            alert("Berhasil!");
+                            location.reload();
+                        });
+                    });
+                }
+            );
+        });
+
+        // 4. LOGIKA MENAMPILKAN & MENGHAPUS VIDEO
+        db.collection("videos").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+            const container = document.getElementById('videoContainer');
+            container.innerHTML = "<h3>Daftar Video</h3>";
+            
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const id = doc.id;
+                
+                const card = document.createElement('div');
+                card.className = "thumbnail";
+                card.innerHTML = `
+                    <div class="thumb-img" onclick="playVideo('${data.url}', '${data.title}')">▶</div>
+                    <div class="thumb-text">
+                        <h4 onclick="playVideo('${data.url}', '${data.title}')">${data.title}</h4>
+                        <button class="btn-delete" onclick="deleteVideo('${id}', '${data.fileName}')">Hapus</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        });
+
+        function playVideo(url, title) {
+            document.getElementById('mainPlayer').src = url;
+            document.getElementById('videoTitleDisplay').innerText = title;
+            document.getElementById('mainPlayer').play();
+            window.scrollTo(0,0);
         }
-        .logo { font-size: 20px; font-weight: bold; color: #fff; text-decoration: none; }
-        .logo span { color: var(--accent); }
 
-        /* --- PERBAIKAN UTAMA: MODAL FULLSCREEN --- */
-        .modal {
-            display: none; /* Sembunyi awal */
-            position: fixed; 
-            top: 0; left: 0; 
-            width: 100vw; 
-            height: 100vh;
-            background: #000; 
-            z-index: 9999;
-            flex-direction: column;
+        async function deleteVideo(id, fileName) {
+            if(confirm("Yakin ingin menghapus video ini?")) {
+                try {
+                    await storage.ref(fileName).delete(); // Hapus file video
+                    await db.collection("videos").doc(id).delete(); // Hapus data teks
+                    alert("Terhapus!");
+                } catch (err) { alert("Gagal hapus: " + err.message); }
+            }
         }
-
-        /* Kotak Video: Dibuat memenuhi layar 100% tanpa batas rasio */
-        .modal-box {
-            width: 100%;
-            height: 100%;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Iframe: Wajib 100% */
-        iframe { width: 100%; height: 100%; border: none; }
-
-        /* Tombol Tutup: Ditaruh di pojok atas agar mudah dipencet */
-        .close-btn {
-            position: absolute; 
-            top: 15px; 
-            right: 15px; 
-            color: #fff; 
-            background: rgba(0,0,0,0.5);
-            padding: 8px 15px;
-            border-radius: 50px;
-            font-size: 14px; 
+    </script>
+</body>
+</html>
             cursor: pointer; 
             z-index: 10000; /* Paling atas */
             border: 1px solid #fff;
